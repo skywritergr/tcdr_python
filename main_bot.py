@@ -1,11 +1,7 @@
-from difflib import SequenceMatcher
 from flask import Flask, Response
 import re
-import string
 import tweepy
-import pyphen
 import json
-import pika
 
 app = Flask(__name__)
 
