@@ -1,4 +1,5 @@
 from difflib import SequenceMatcher
+from flask import Flask, Response
 import re
 import string
 import tweepy
@@ -6,7 +7,7 @@ import pyphen
 import json
 import pika
 
-WORDLIST = ['Chelsea']
+app = Flask(__name__)
 
 
 def auth_with_tweeter():
@@ -26,38 +27,42 @@ def auth_with_tweeter():
 
     return api
 
-
-class MyStreamListener(tweepy.StreamListener):
-    '''Dealing with the tweets. Checking if they are valid for RT'''
-    hasMention = re.compile(r"\@")
-    tweet_list = {}
-
-    def is_similar(self, tweet):
-        '''Checking if the two tweets in the list are similar, same or RT'''
-        ratio = SequenceMatcher(None, tweet, self.tweet_list[0]).ratio()
-        # print('ratio for ~~'+ tweet +'~~   = ' + str(ratio))
-        return ratio
-
-    def number_of_hashtags(self, tweet):
-        '''Checking the number of hashtags in the tweet'''
-        return len(re.findall(r"#", tweet))
-
-    def is_english(self, word):
-        '''Checks if the word is english'''
-        try:
-            word.encode('ascii')
-        except UnicodeEncodeError:
-            return False
-        else:
-            return True
-
-    def on_status(self, data):
-        '''this is the tweepy function that runs whenever we receive a tweet'''
-        # print(str(data.id) + " " + data.text)
-        print(json.dumps(data._json, indent=4))
-        return False
-
 API = auth_with_tweeter()
-MYSTREAM = MyStreamListener()
-TWEET_HOSE = tweepy.Stream(auth=API.auth, listener=MYSTREAM)
-TWEET_HOSE.filter(track=WORDLIST)
+
+
+def get_tweets_for_user(user_id):
+    tweets = API.user_timeline(user_id=user_id, count=100)
+    final_text = ""
+    for tweet in tweets:
+        tweet_text = tweet._json["text"]
+        raw_text = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", tweet_text).split())
+        final_text += (" " + raw_text)
+    # print(final_text)
+    return final_text
+
+
+def get_object(data):
+    final_obj = {}
+    user_id = data._json["user"]["id_str"]
+    final_obj["user_id"] = user_id
+    final_obj["tweets"] = get_tweets_for_user(user_id)
+    return final_obj
+
+
+@app.route('/samaritans')
+def users_to_help():
+    # location = session.get('location', None)
+    # term = session.get('term', None)
+    users_array = []
+    search_results = API.search(q="refugees", geocode="52.9548,1.1581,30mi",
+                                count=10)
+    counter = 0
+    for tweet in search_results:
+        counter += 1
+        obj = get_object(tweet)
+        users_array.append(obj)
+    # print(search_results)
+    return Response(json.dumps(users_array),  mimetype='application/json')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
