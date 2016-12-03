@@ -1,4 +1,4 @@
-from flask import Flask, Response
+from flask import Flask, Response, request
 import re
 import tweepy
 import json
@@ -40,17 +40,19 @@ def get_tweets_for_user(user_id):
 def get_object(data):
     final_obj = {}
     user_id = data._json["user"]["id_str"]
+    # print(json.dumps(data._json, indent=4))
     final_obj["user_id"] = user_id
+    final_obj["location"] = data._json["user"]["location"]
     final_obj["tweets"] = get_tweets_for_user(user_id)
     return final_obj
 
 
 @app.route('/samaritans')
 def users_to_help():
-    # location = session.get('location', None)
-    # term = session.get('term', None)
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')
     users_array = []
-    search_results = API.search(q="refugees", geocode="52.9548,1.1581,30mi",
+    search_results = API.search(q="refugees", geocode=lat+","+lon+",5mi",
                                 count=10)
     counter = 0
     for tweet in search_results:
